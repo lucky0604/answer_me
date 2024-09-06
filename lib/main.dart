@@ -1,9 +1,59 @@
-import 'package:english_words/english_words.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_acrylic/flutter_acrylic.dart';
+import 'package:flutter_acrylic/window.dart';
+import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/root/get_material_app.dart';
 
-void main() {
-  runApp(MyApp());
+import 'package:answer_me/components/MainMenu.dart';
+import 'package:answer_me/controller/MainMenuController.dart';
+import 'package:answer_me/utils/Util.dart';
+import 'package:answer_me/views/AppsView.dart';
+import 'package:answer_me/views/ChatsView.dart';
+import 'package:answer_me/views/FriendsView.dart';
+import 'package:answer_me/views/GithubView.dart';
+import 'package:answer_me/views/SettingView.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Window.initialize();
+  if (!Platform.isLinux) {
+    if (Platform.isWindows) {
+      await Window.setEffect(
+          effect: WindowEffect.solid, color: Colors.transparent);
+
+      if (Platform.operatingSystemVersion.contains('(')) {
+        var version = Platform.operatingSystemVersion
+            .split('(')[1]
+            .split(')')[0]
+            .toLowerCase()
+            .replaceAll('build', '')
+            .trim();
+        if (int.parse(version) > 19045) {
+          await Window.setEffect(
+              effect: WindowEffect.acrylic, color: Colors.transparent);
+        }
+      }
+    } else {
+      await Window.setEffect(
+          effect: WindowEffect.acrylic, color: Colors.transparent);
+    }
+  }
+
+  appWindow.size = const Size(1000, 650);
+  runApp(const MyApp());
+  appWindow.show();
+  doWhenWindowReady(() {
+    final win = appWindow;
+    const initialSize = Size(900, 600);
+    win.minSize = initialSize;
+    win.size = appWindow.size;
+    win.alignment = Alignment.center;
+    win.title = 'Answer Me';
+    win.show();
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -11,270 +61,116 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => MyAppState(),
-      child: MaterialApp(
-        title: 'Namer App',
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
-        ),
-        home: MyHomePage(),
-      ),
-    );
+    return GetMaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Row(children: [
+              LeftSide(
+                child: MainMenu(),
+              ),
+              RightSide()
+            ])));
   }
 }
 
-class MyAppState extends ChangeNotifier {
-  var current = WordPair.random();
-  var history = <WordPair>[];
-
-  GlobalKey? historyListKey;
-
-  void getNext() {
-    history.insert(0, current);
-    var animatedList = historyListKey?.currentState as AnimatedListState?;
-    animatedList?.insertItem(0);
-    current = WordPair.random();
-    notifyListeners();
-  }
-
-  var favorites = <WordPair>[];
-
-  void toggleFavorite([WordPair? pair]) {
-    pair = pair ?? current;
-    if (favorites.contains(current)) {
-      favorites.remove(pair);
-    } else {
-      favorites.add(pair);
-    }
-    notifyListeners();
-  }
-
-  void removeFavorite(WordPair pair) {
-    favorites.remove(pair);
-    notifyListeners();
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-
-  var selectedIndex = 0;
+class LeftSide extends StatelessWidget {
+  final Widget child;
+  const LeftSide({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-
-    var colorScheme = Theme.of(context).colorScheme;
-
-    Widget page;
-    switch(selectedIndex) {
-      case 0:
-        page = GeneratorPage();
-        break;
-      case 1:
-        page = FavoritesPage();
-        break;
-      default:
-        throw UnimplementedError("no widget for $selectedIndex");
-    }
-
-    var mainArea = ColoredBox(
-      color: colorScheme.surfaceVariant,
-      child: AnimatedSwitcher(
-        duration: Duration(milliseconds: 200),
-        child: page,
-      )
-    );
-
-    return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 450) {
-            return Column(
-              children: [
-                Expanded(child: mainArea),
-                SafeArea(
-                  child: BottomNavigationBar(
-                    items: [
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.home),
-                        label: 'Home',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.favorite),
-                        label: 'Favorites',
-                      )
-                    ],
-                    currentIndex: selectedIndex,
-                    onTap: (value) {
-                      setState(() {
-                        selectedIndex = value;
-                      });
-                    }
-                  )
-                )
-              ]
-            );
-          } else {
-            return Row(
-              children: [
-                SafeArea(
-                  child: NavigationRail(
-                    extended: constraints.maxWidth >= 600,
-                    selectedIndex: selectedIndex,
-                    destinations: [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.home),
-                        label: Text('Home'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.favorite),
-                        label: Text('Favorites'),
-                      )
-                    ],
-                    onDestinationSelected: (value) {
-                      setState(() {
-                        selectedIndex = value;
-                      });
-                    },
-                  )
-                ),
-                Expanded(child: mainArea)
-              ]
-            );
-          }
-        },
-      )
-    );
-  }
-}
-
-
-class GeneratorPage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-    var pair = appState.current;
-
-    IconData icon;
-    if (appState.favorites.contains(pair)) {
-      icon = Icons.favorite;
-    } else {
-      icon = Icons.favorite_border;
-    }
-
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            BigCard(pair: pair),
-            SizedBox(height: 10,),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    appState.toggleFavorite();
-                  },
-                  icon: Icon(icon),
-                  label: Text('Favorite'),
-                ),
-                SizedBox(width: 10,),
-                ElevatedButton(
-                  onPressed: () {
-                    appState.getNext();
-                  },
-                  child: Text('Next'),
-                ),
+    return SizedBox(
+        width: 65,
+        child: Container(
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.fromARGB(170, 53, 36, 77),
+                Color.fromARGB(170, 53, 36, 77)
               ],
-            )
-          ],
-        ),
-      ),
-    );
+            )),
+            child: Column(children: [Expanded(child: child)])));
   }
 }
 
-class BigCard extends StatelessWidget {
-  const BigCard({
-    super.key,
-    required this.pair,
-  });
-
-  final WordPair pair;
+class RightSide extends StatelessWidget {
+  final MainMenuController controller = Get.put(MainMenuController());
 
   @override
   Widget build(BuildContext context) {
-
-    final theme = Theme.of(context);
-
-    final style = theme.textTheme.displayMedium!.copyWith(
-      color: theme.colorScheme.onPrimary,
-    );
-
-    return Card(
-      color: theme.colorScheme.primary,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Text(pair.asLowerCase, style: style, semanticsLabel: "${pair.first} ${pair.second}",),
-      ),
-    );
+    return Expanded(
+        child: Stack(alignment: AlignmentDirectional.topStart, children: [
+      Container(
+          color: Colors.transparent,
+          child: Obx(() {
+            if (controller.active.value == 'chats') {
+              return ChatsView();
+            }
+            if (controller.active.value == 'apps') {
+              return AppsView();
+            }
+            if (controller.active.value == 'friends') {
+              return FriendsView();
+            }
+            if (controller.active.value == 'setting') {
+              return SettingView();
+            }
+            if (controller.active.value == 'github') {
+              return GithubView();
+            }
+            return Container(child: Text("No view selected"));
+          })),
+      Column(children: [
+        WindowTitleBarBox(
+            child: Row(children: [
+          Expanded(child: MoveWindow()),
+          const WindowButtons()
+        ]))
+      ])
+    ]));
   }
 }
 
-class FavoritesPage extends StatelessWidget {
+final buttonColors = WindowButtonColors(
+    iconNormal: Colors.black,
+    mouseOver: const Color.fromARGB(255, 224, 224, 224),
+    mouseDown: const Color.fromARGB(255, 202, 202, 202),
+    iconMouseOver: Colors.black,
+    iconMouseDown: Colors.black);
 
-  
+final closeButtonColors = WindowButtonColors(
+    mouseOver: Colors.red,
+    mouseDown: const Color.fromARGB(255, 206, 54, 43),
+    iconNormal: Colors.black,
+    iconMouseOver: Colors.black);
+
+class WindowButtons extends StatefulWidget {
+  const WindowButtons({super.key});
+
+  @override
+  State<WindowButtons> createState() => _WindowButtonsState();
+}
+
+class _WindowButtonsState extends State<WindowButtons> {
+  void maximizeOrRestore() async {
+    setState(() {
+      appWindow.maximizeOrRestore();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    var theme = Theme.of(context);
-    var appState = context.watch<MyAppState>();
-
-    if (appState.favorites.isEmpty) {
-      return Center(
-        child: Text("No favorites yet")
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(30),
-          child: Text('You have ${appState.favorites.length} favorites'),
-        ),
-        Expanded(
-          child: GridView(
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 400,
-              childAspectRatio: 400 / 80,
-            ),
-            children: [
-              for (var pair in appState.favorites)
-                ListTile(
-                  leading: IconButton(
-                    icon: Icon(Icons.delete_outline, semanticLabel: 'Delete',),
-                    color: theme.colorScheme.primary,
-                    onPressed: () {
-                      appState.removeFavorite(pair);
-                    },
-                  ),
-                  title: Text(
-                    pair.asLowerCase,
-                    semanticsLabel: pair.asPascalCase,
-                  )
-                )
-            ]
-          )
-        )
-      ],
-    );
+    return Row(children: [
+      MinimizeWindowButton(colors: buttonColors),
+      appWindow.isMaximized
+          ? RestoreWindowButton(
+              colors: buttonColors, onPressed: maximizeOrRestore)
+          : MaximizeWindowButton(
+              colors: buttonColors, onPressed: maximizeOrRestore),
+      CloseWindowButton(colors: closeButtonColors)
+    ]);
   }
 }
